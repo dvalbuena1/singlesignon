@@ -12,20 +12,25 @@ def index(request):
     context = {
         'polls': []
     }
-    polls = models.Poll.objects.all()
-    for poll in polls:
-        item = {
-            "title": poll.title,
-            "id": poll.pk,
-            "answers": [{
-                "value": answer.value,
-                "user_first_name": answer.user.first_name,
-                "user_last_name": answer.user.last_name,
-                "id": answer.pk,
-            } for answer in poll.answers.all()]
-        }
-        context['polls'].append(item)
+    polls = {}
+    # select_related will do the JOIN to bring the information from poll and user
+    answers = models.Answer.objects.select_related('poll').select_related('user').all()
+    # Another alternative is to use a raw SQL statement to skip some fields from the poll and user tables.
+    # Since select_related will bring in attributes that are not needed.
 
+    for answer in answers:
+        poll = polls.get(answer.poll.pk, {})
+        poll["title"] = poll.get("title", answer.poll.title)
+        poll["id"] = poll.get("id", answer.poll.pk)
+        poll["answers"] = poll.get("answers", [])
+        poll["answers"].append({
+            "value": answer.value,
+            "user_first_name": answer.user.first_name,
+            "user_last_name": answer.user.last_name,
+            "id": answer.pk,
+        })
+        polls[answer.poll.pk] = poll
+    context["polls"] = list(polls.values())
     return render(request, 'polls/index.html', context)
 
 @login_required
